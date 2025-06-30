@@ -3,23 +3,50 @@ import os
 import requests
 
 def get_db_connection():
-    conn = psycopg2.connect(
-        host=os.getenv('DB_HOST'),  # IP de tu EC2
-        database=os.getenv('DB_NAME'),
-        user=os.getenv('DB_USER'),
-        password=os.getenv('DB_PASSWORD')
-    )
-    return conn
+    try:
+        conn = psycopg2.connect(
+            host=os.getenv('DB_HOST'),
+            database=os.getenv('DB_NAME'),
+            user=os.getenv('DB_USER'),
+            password=os.getenv('DB_PASSWORD'),
+            port=5432
+        )
+        print("✅ Conexión a PostgreSQL exitosa")
+        return conn
+    except Exception as e:
+        print(f"❌ Error conectando a PostgreSQL: {e}")
+        raise
 
 def get_sales_data():
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute('SELECT * FROM ventas ORDER BY fecha DESC LIMIT 10')
-    sales = cur.fetchall()
-    cur.close()
-    conn.close()
-    return sales
-
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute('''
+            SELECT v.id, v.fecha, v.total, 
+                   c.nombre AS cliente_nombre,
+                   p.nombre AS producto_nombre
+            FROM ventas v
+            JOIN clientes c ON v.cliente_id = c.id
+            JOIN detalles_venta dv ON v.id = dv.venta_id
+            JOIN productos p ON dv.producto_id = p.id
+            ORDER BY v.fecha DESC 
+            LIMIT 10
+        ''')
+        
+        # Obtener nombres de columnas
+        column_names = [desc[0] for desc in cur.description]
+        
+        # Crear lista de diccionarios
+        sales = []
+        for row in cur.fetchall():
+            sales.append(dict(zip(column_names, row)))
+        
+        cur.close()
+        conn.close()
+        return sales
+    except Exception as e:
+        print(f"Error getting sales data: {e}")
+        return []
 def get_weather_data(city):
     API_KEY = os.getenv('WEATHER_API_KEY')
     url = f'http://api.openweathermap.org/data/2.5/weather?q={city}&appid={API_KEY}&units=metric'

@@ -1,4 +1,3 @@
-// frontend/src/components/ColorPicker.js
 import React, { useState } from "react";
 import { getColorInfo, saveColorAnalysis } from "../services/api";
 
@@ -8,32 +7,47 @@ const ColorPicker = () => {
   const [clientId, setClientId] = useState("");
   const [skinTone, setSkinTone] = useState("");
   const [hairColor, setHairColor] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const data = await getColorInfo(hex);
-    setColorData(data);
+    try {
+      const data = await getColorInfo(hex);
+      setColorData(data);
+      setSaveStatus(null);
+    } catch (error) {
+      console.error("Error fetching color info:", error);
+      setSaveStatus({ type: "error", message: "Error al obtener información del color" });
+    }
   };
 
-  const saveAnalysis = async () => {
-    if (!colorData || !clientId) return;
+  const handleSaveAnalysis = async () => {
+    if (!colorData || !clientId) {
+      setSaveStatus({ type: "error", message: "ID de cliente y datos de color son requeridos" });
+      return;
+    }
     
-    const analysisData = {
-      client_id: clientId,
-      color_data: {
-        hex: colorData.hex.clean,
-        name: colorData.name.value,
-        skin_tone: skinTone,
-        hair_color: hairColor,
-        recommended_colors: colorData.harmonies?.complement?.colors?.map(c => c.hex.clean).join(", ")
-      }
-    };
-
+    setSaving(true);
+    setSaveStatus(null);
+    
     try {
+      const analysisData = {
+        client_id: clientId,
+        color_data: {
+          skin_tone: skinTone,
+          hair_color: hairColor,
+          recommended_colors: colorData.hsl ? `H:${colorData.hsl.h}, S:${colorData.hsl.s}, L:${colorData.hsl.l}` : ""
+        }
+      };
+      
       await saveColorAnalysis(analysisData);
-      alert("Análisis guardado correctamente");
+      setSaveStatus({ type: "success", message: "Análisis guardado correctamente" });
     } catch (error) {
-      console.error("Error guardando análisis:", error);
+      console.error("Error saving analysis:", error);
+      setSaveStatus({ type: "error", message: "Error al guardar el análisis" });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -43,7 +57,11 @@ const ColorPicker = () => {
       <form onSubmit={handleSubmit}>
         <div className="form-group">
           <label>Código Hex (sin #):</label>
-          <input value={hex} onChange={(e) => setHex(e.target.value)} />
+          <input 
+            value={hex} 
+            onChange={(e) => setHex(e.target.value)} 
+            placeholder="Ej: ff5733"
+          />
         </div>
         <button type="submit">Analizar Color</button>
       </form>
@@ -52,13 +70,13 @@ const ColorPicker = () => {
         <div className="color-results">
           <div 
             className="color-display" 
-            style={{ backgroundColor: `#${colorData.hex.clean}` }}
+            style={{ backgroundColor: `#${colorData.hex?.clean || hex}` }}
           ></div>
           
           <div className="color-info">
-            <p><strong>Nombre:</strong> {colorData.name.value}</p>
-            <p><strong>RGB:</strong> {colorData.rgb.value}</p>
-            <p><strong>Hex:</strong> #{colorData.hex.clean}</p>
+            <p><strong>Nombre:</strong> {colorData.name?.value || "Sin nombre"}</p>
+            <p><strong>RGB:</strong> {colorData.rgb?.value || "N/A"}</p>
+            <p><strong>Hex:</strong> #{colorData.hex?.clean || hex}</p>
           </div>
 
           <div className="client-data">
@@ -67,6 +85,7 @@ const ColorPicker = () => {
               placeholder="ID del Cliente" 
               value={clientId}
               onChange={(e) => setClientId(e.target.value)}
+              required
             />
             <input 
               placeholder="Tono de piel" 
@@ -78,7 +97,19 @@ const ColorPicker = () => {
               value={hairColor}
               onChange={(e) => setHairColor(e.target.value)}
             />
-            <button onClick={saveAnalysis}>Guardar Análisis</button>
+            
+            <button 
+              onClick={handleSaveAnalysis} 
+              disabled={saving}
+            >
+              {saving ? "Guardando..." : "Guardar Análisis"}
+            </button>
+            
+            {saveStatus && (
+              <p className={saveStatus.type === "success" ? "success" : "error"}>
+                {saveStatus.message}
+              </p>
+            )}
           </div>
         </div>
       )}

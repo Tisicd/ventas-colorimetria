@@ -6,14 +6,12 @@ services:
       - "80:80"
     depends_on:
       - backend
+    environment:
+      - REACT_APP_BACKEND_URL=http://backend:5000  # Usar nombre del servicio
+
   backend:
     build: ./backend
-    ports:
-      - "5000:5000"
-    environment:
-      - DB_HOST=tu-ip-ec2
-      - DB_USER=postgres
-      - DB_PASSWORD=tu-password
-      - DB_NAME=sales
-      - WEATHER_API_KEY=tu-api-key-clima
-      - COLOR_API_ENABLED=true
+    expose:
+      - "5000"
+    env_file:
+      - .env
